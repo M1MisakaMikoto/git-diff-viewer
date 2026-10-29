@@ -29,6 +29,14 @@ VS Code 自带的 Git 变更列表更偏向工作区状态，版本之间的 com
 3. 点击标题栏的对比按钮，选择对比范围。
 4. 展开目录节点，点击文件即可打开 diff。
 
+### 安装 VSIX
+
+在项目根目录生成安装包后执行：
+
+```powershell
+code --install-extension ".\git-version-diff-viewer-0.1.0.vsix"
+```
+
 默认对比范围是 `HEAD ↔ 工作区`。版本选择器中可以：
 
 - 选择本地分支、远程分支、标签或最近提交。

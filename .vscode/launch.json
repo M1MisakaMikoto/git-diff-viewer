@@ -11,6 +11,10 @@
       "outFiles": [
         "${workspaceFolder}/out/**/*.js"
       ],
+      "sourceMaps": true,
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
       "preLaunchTask": "npm: compile"
     }
   ]
