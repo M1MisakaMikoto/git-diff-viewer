@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { promises as fs, type Dirent } from "node:fs";
 import * as path from "node:path";
 import { parseNameStatus } from "./model";
 import {
@@ -8,6 +9,22 @@ import {
 } from "./types";
 
 const MAX_BUFFER = 64 * 1024 * 1024;
+const DEFAULT_REPOSITORY_SEARCH_DEPTH = 6;
+const MAX_SCANNED_DIRECTORIES = 20_000;
+const SKIPPED_REPOSITORY_SCAN_DIRECTORIES = new Set([
+  ".git",
+  ".hg",
+  ".svn",
+  "node_modules",
+  "dist",
+  "build",
+  "out",
+  "target",
+  "coverage",
+  "vendor",
+  ".next",
+  ".cache",
+]);
 
 export interface GitRefItem {
   ref: string;
@@ -16,43 +33,71 @@ export interface GitRefItem {
   kind: "branch" | "remote" | "tag" | "commit";
 }
 
-export class GitService {
-  async discoverRepositories(workspaceFolders: string[]): Promise<RepositoryInfo[]> {
-    const repositories = await Promise.all(
-      workspaceFolders.map(async (folder) => {
-        try {
-          const topLevel = await this.runGit(
-            ["rev-parse", "--show-toplevel"],
-            folder,
-          );
-          const root = path.resolve(topLevel.trim());
-          const branch = await this.getBranch(root);
+export interface RepositoryDiscoveryOptions {
+  knownRoots?: string[];
+  maxDepth?: number;
+}
 
-          return {
-            root,
-            name: path.basename(root) || root,
-            branch,
-          } satisfies RepositoryInfo;
-        } catch {
-          return undefined;
-        }
+export class GitService {
+  async discoverRepositories(
+    workspaceFolders: string[],
+    options: RepositoryDiscoveryOptions = {},
+  ): Promise<RepositoryInfo[]> {
+    const roots = new Set<string>();
+    const requestedDepth =
+      options.maxDepth ?? DEFAULT_REPOSITORY_SEARCH_DEPTH;
+    const maxDepth = Number.isFinite(requestedDepth)
+      ? Math.max(0, Math.floor(requestedDepth))
+      : DEFAULT_REPOSITORY_SEARCH_DEPTH;
+    const scanState = { remaining: MAX_SCANNED_DIRECTORIES };
+
+    for (const folder of workspaceFolders) {
+      const absoluteFolder = path.resolve(folder);
+      const containingRoot = await this.resolveContainingRepository(
+        absoluteFolder,
+      );
+      if (containingRoot) {
+        roots.add(containingRoot);
+      }
+      await this.scanForRepositories(
+        absoluteFolder,
+        0,
+        maxDepth,
+        roots,
+        scanState,
+      );
+    }
+
+    for (const knownRoot of options.knownRoots ?? []) {
+      const absoluteRoot = path.resolve(knownRoot);
+      if (await this.isDirectory(absoluteRoot)) {
+        roots.add(absoluteRoot);
+      }
+    }
+
+    const unique = new Map<string, RepositoryInfo>();
+    const repositories = await Promise.all(
+      Array.from(roots).map(async (root) => {
+        const branch = await this.getBranch(root);
+        return {
+          root,
+          name: path.basename(root) || root,
+          branch,
+        } satisfies RepositoryInfo;
       }),
     );
 
-    const unique = new Map<string, RepositoryInfo>();
     for (const repository of repositories) {
-      if (!repository) {
-        continue;
-      }
-
       const key = normalizePathKey(repository.root);
       if (!unique.has(key)) {
         unique.set(key, repository);
       }
     }
 
-    return Array.from(unique.values()).sort((left, right) =>
-      left.name.localeCompare(right.name),
+    return Array.from(unique.values()).sort(
+      (left, right) =>
+        left.name.localeCompare(right.name) ||
+        left.root.localeCompare(right.root),
     );
   }
 
@@ -294,6 +339,83 @@ export class GitService {
     }
   }
 
+  private async resolveContainingRepository(
+    folder: string,
+  ): Promise<string | undefined> {
+    try {
+      const topLevel = await this.runGit(
+        ["rev-parse", "--show-toplevel"],
+        folder,
+      );
+      return path.resolve(topLevel.trim());
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async scanForRepositories(
+    directory: string,
+    depth: number,
+    maxDepth: number,
+    roots: Set<string>,
+    scanState: { remaining: number },
+  ): Promise<void> {
+    if (scanState.remaining <= 0) {
+      return;
+    }
+    scanState.remaining -= 1;
+
+    if (await this.hasGitMetadata(directory)) {
+      roots.add(path.resolve(directory));
+    }
+
+    if (depth >= maxDepth) {
+      return;
+    }
+
+    let entries: Dirent[];
+    try {
+      entries = await fs.readdir(directory, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      if (
+        !entry.isDirectory() ||
+        entry.isSymbolicLink() ||
+        SKIPPED_REPOSITORY_SCAN_DIRECTORIES.has(entry.name)
+      ) {
+        continue;
+      }
+
+      await this.scanForRepositories(
+        path.join(directory, entry.name),
+        depth + 1,
+        maxDepth,
+        roots,
+        scanState,
+      );
+    }
+  }
+
+  private async hasGitMetadata(directory: string): Promise<boolean> {
+    try {
+      const stat = await fs.stat(path.join(directory, ".git"));
+      return stat.isDirectory() || stat.isFile();
+    } catch {
+      return false;
+    }
+  }
+
+  private async isDirectory(target: string): Promise<boolean> {
+    try {
+      return (await fs.stat(target)).isDirectory();
+    } catch {
+      return false;
+    }
+  }
+
   private collectChanges(
     raw: string,
     changes: Map<string, FileChange>,
@@ -366,7 +488,8 @@ function sortChanges(changes: Map<string, FileChange>): FileChange[] {
 }
 
 function normalizePathKey(repoRoot: string): string {
+  const resolved = path.resolve(repoRoot);
   return process.platform === "win32"
-    ? repoRoot.toLowerCase()
-    : repoRoot;
+    ? resolved.toLowerCase()
+    : resolved;
 }

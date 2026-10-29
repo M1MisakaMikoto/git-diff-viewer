@@ -21,6 +21,7 @@ import {
 export interface TreeDataHost {
   getRepositories(): RepositoryInfo[];
   getSnapshot(repoRoot: string): RepositorySnapshot | undefined;
+  getSelectedRepositoryRoot(): string | undefined;
   isLoading(): boolean;
 }
 
@@ -65,6 +66,17 @@ export class ChangesTreeProvider
             },
           },
         ];
+      }
+
+      const selectedRoot = this.host.getSelectedRepositoryRoot();
+      const selectedRepository =
+        selectedRoot === undefined
+          ? undefined
+          : repositories.find((repository) =>
+              samePath(repository.root, selectedRoot),
+            );
+      if (selectedRepository) {
+        return this.snapshotRoots(selectedRepository.root);
       }
 
       if (repositories.length === 1) {
@@ -328,4 +340,12 @@ export function diffTitle(
   targetLabel: string,
 ): string {
   return `${path.posix.basename(changePath)} (${baseLabel} ↔ ${targetLabel})`;
+}
+
+function samePath(left: string, right: string): boolean {
+  const normalizedLeft = path.resolve(left);
+  const normalizedRight = path.resolve(right);
+  return process.platform === "win32"
+    ? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase()
+    : normalizedLeft === normalizedRight;
 }

@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import test, { after } from "node:test";
 import { GitService } from "../src/git";
 
 const fixtureRoot = fs.mkdtempSync(
   path.join(process.cwd(), ".git-diff-viewer-test-"),
+);
+const nestedWorkspaceRoot = fs.mkdtempSync(
+  path.join(os.tmpdir(), "git-diff-viewer-nested-"),
 );
 const git = new GitService();
 
@@ -15,6 +19,7 @@ after(() => {
   if (resolved.startsWith(path.resolve(process.cwd()))) {
     fs.rmSync(resolved, { recursive: true, force: true });
   }
+  fs.rmSync(nestedWorkspaceRoot, { recursive: true, force: true });
 });
 
 function runGit(...args: string[]): string {
@@ -170,4 +175,50 @@ test("GitService treats all files as additions in a repository without commits",
   assert.equal(byPath.get("tracked.ts")?.status, "A");
   assert.equal(byPath.get("untracked.ts")?.status, "A");
   assert.deepEqual(await git.getRefItems(unbornRoot), []);
+});
+
+test("GitService discovers repositories nested below a non-repository workspace folder", async () => {
+  const appRoot = path.join(nestedWorkspaceRoot, "app");
+  const libraryRoot = path.join(nestedWorkspaceRoot, "packages", "lib");
+  const ignoredRoot = path.join(
+    nestedWorkspaceRoot,
+    "node_modules",
+    "dependency",
+  );
+
+  for (const root of [appRoot, libraryRoot, ignoredRoot]) {
+    fs.mkdirSync(root, { recursive: true });
+    execFileSync("git", ["init", "-q"], {
+      cwd: root,
+      windowsHide: true,
+    });
+  }
+
+  const repositories = await git.discoverRepositories([
+    nestedWorkspaceRoot,
+  ]);
+  assert.deepEqual(
+    repositories.map((repository) => repository.root),
+    [appRoot, libraryRoot],
+  );
+  assert.ok(
+    repositories.every((repository) => repository.root !== nestedWorkspaceRoot),
+  );
+});
+
+test("GitService includes repositories supplied by the VS Code Git extension", async () => {
+  const knownRoot = path.join(nestedWorkspaceRoot, "known", "service");
+  fs.mkdirSync(knownRoot, { recursive: true });
+  execFileSync("git", ["init", "-q"], {
+    cwd: knownRoot,
+    windowsHide: true,
+  });
+
+  const repositories = await git.discoverRepositories([], {
+    knownRoots: [knownRoot],
+  });
+  assert.deepEqual(
+    repositories.map((repository) => repository.root),
+    [knownRoot],
+  );
 });

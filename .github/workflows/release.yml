@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+
+      - name: Verify version tag
+        shell: bash
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          test "v$VERSION" = "$GITHUB_REF_NAME"
+
+      - name: Package VSIX
+        shell: bash
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          npx --yes @vscode/vsce package \
+            --no-dependencies \
+            --out "git-diff-viewer-$VERSION.vsix"
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          gh release create "$GITHUB_REF_NAME" \
+            "git-diff-viewer-$VERSION.vsix" \
+            --title "Git Diff Viewer $GITHUB_REF_NAME" \
+            --generate-notes

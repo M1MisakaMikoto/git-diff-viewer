@@ -2,7 +2,7 @@
   "name": "git-diff-viewer",
   "displayName": "Git Diff Viewer",
   "description": "按目录浏览完整 Git 项目树与版本差异，并直接打开原生 diff 编辑器。",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "local",
   "license": "MIT",
   "repository": {
@@ -77,6 +77,18 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "gitDiffViewer.chooseRepository",
+        "title": "选择仓库",
+        "category": "Git 版本对比",
+        "icon": "$(repo)"
+      },
+      {
+        "command": "gitDiffViewer.setupCodex",
+        "title": "配置 Codex 集成",
+        "category": "Git 版本对比",
+        "icon": "$(plug)"
+      },
+      {
         "command": "gitDiffViewer.chooseComparison",
         "title": "选择对比范围",
         "category": "Git 版本对比",
@@ -123,14 +135,24 @@
     "menus": {
       "view/title": [
         {
+          "command": "gitDiffViewer.setupCodex",
+          "when": "view == gitDiffViewer.changes && !gitDiffViewer.codexConfigured",
+          "group": "navigation@0"
+        },
+        {
+          "command": "gitDiffViewer.chooseRepository",
+          "when": "view == gitDiffViewer.changes && gitDiffViewer.hasRepository",
+          "group": "navigation@1"
+        },
+        {
           "command": "gitDiffViewer.chooseComparison",
           "when": "view == gitDiffViewer.changes",
-          "group": "navigation@1"
+          "group": "navigation@2"
         },
         {
           "command": "gitDiffViewer.refresh",
           "when": "view == gitDiffViewer.changes",
-          "group": "navigation@2"
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
@@ -187,6 +209,13 @@
           "type": "boolean",
           "default": true,
           "description": "文件保存或工作区文件变化后自动刷新差异。"
+        },
+        "gitDiffViewer.repositorySearchDepth": {
+          "type": "number",
+          "default": 6,
+          "minimum": 1,
+          "maximum": 20,
+          "description": "在工作区目录中搜索嵌套 Git 仓库的最大目录深度。"
         }
       }
     }
