@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { GitService } from "./git";
 
-export const GIT_DIFF_SCHEME = "git-version-diff-viewer";
+export const GIT_DIFF_SCHEME = "git-diff-viewer";
 
 export interface VirtualContentQuery {
   source: "ref" | "index" | "empty";

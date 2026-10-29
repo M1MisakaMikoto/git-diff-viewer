@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildChangeTree,
+  buildFileTree,
   comparisonLabel,
   directoryCountsText,
   directoryStateText,
@@ -47,8 +48,8 @@ test("buildChangeTree aggregates status by directory", () => {
   assert.equal(directoryCountsText(src.summary), "修改 2 · 新增 1");
   assert.equal(app.summary.total, 2);
   assert.equal(files.length, 2);
-  assert.equal(files[0].change.path, "src/app/main.ts");
-  assert.equal(files[1].change.path, "src/app/new.ts");
+  assert.equal(files[0].filePath, "src/app/main.ts");
+  assert.equal(files[1].filePath, "src/app/new.ts");
 });
 
 test("buildChangeTree reports folders containing only additions", () => {
@@ -100,6 +101,30 @@ test("directories sort before files and use numeric natural ordering", () => {
   const roots: TreeNode[] = buildChangeTree(changes, "/repo", "repo");
 
   assert.equal(roots[0].kind, "directory");
-  assert.equal((roots[1] as FileNode).change.path, "file2.ts");
-  assert.equal((roots[2] as FileNode).change.path, "file10.ts");
+  assert.equal((roots[1] as FileNode).filePath, "file2.ts");
+  assert.equal((roots[2] as FileNode).filePath, "file10.ts");
+});
+
+test("buildFileTree includes unchanged files alongside changed files", () => {
+  const changes = parseNameStatus("M\0src/a.ts\0A\0src/new.ts\0");
+  const roots = buildFileTree(
+    ["README.md", "src/a.ts", "src/new.ts", "src/unchanged.ts"],
+    changes,
+    "/repo",
+    "repo",
+  );
+  const src = roots.find(
+    (node) => node.kind === "directory" && node.name === "src",
+  ) as DirectoryNode;
+  const readme = roots.find(
+    (node) => node.kind === "file" && node.filePath === "README.md",
+  ) as FileNode;
+  const unchanged = src.children.find(
+    (node) => node.kind === "file" && node.filePath === "src/unchanged.ts",
+  ) as FileNode;
+
+  assert.equal(src.children.length, 3);
+  assert.equal(src.summary.total, 2);
+  assert.equal(readme.change, undefined);
+  assert.equal(unchanged.change, undefined);
 });

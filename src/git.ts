@@ -128,6 +128,42 @@ export class GitService {
     return sortChanges(changes);
   }
 
+  async getAllFiles(
+    repoRoot: string,
+    comparison: ComparisonState,
+  ): Promise<string[]> {
+    const raw =
+      comparison.mode === "refs"
+        ? await this.runGit(
+            [
+              "ls-tree",
+              "-r",
+              "--name-only",
+              "-z",
+              comparison.targetRef ?? "HEAD",
+              "--",
+            ],
+            repoRoot,
+          )
+        : await this.runGit(
+            [
+              "ls-files",
+              "-z",
+              "--cached",
+              "--others",
+              "--exclude-standard",
+            ],
+            repoRoot,
+          );
+
+    return Array.from(new Set(splitNulPaths(raw))).sort((left, right) =>
+      left.localeCompare(right, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      }),
+    );
+  }
+
   async getRefItems(repoRoot: string): Promise<GitRefItem[]> {
     const refsOutput = await this.runGit(
       [

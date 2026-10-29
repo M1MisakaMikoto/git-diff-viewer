@@ -46,6 +46,8 @@ function commit(message: string): void {
 
 test("GitService discovers the repository and reads working changes", async () => {
   runGit("init", "-q");
+  write(".gitignore", "ignored.log\n");
+  write("ignored.log", "ignored\n");
   write("src/a.ts", "one\n");
   write("old.ts", "old\n");
   write("removed.ts", "gone\n");
@@ -71,6 +73,15 @@ test("GitService discovers the repository and reads working changes", async () =
   assert.equal(byPath.get("renamed.ts")?.status, "R");
   assert.equal(byPath.get("renamed.ts")?.oldPath, "old.ts");
   assert.equal(byPath.get("removed.ts")?.status, "D");
+
+  const allFiles = await git.getAllFiles(repositories[0].root, {
+    mode: "working",
+    baseRef: "HEAD",
+  });
+  assert.ok(allFiles.includes("src/a.ts"));
+  assert.ok(allFiles.includes("new.ts"));
+  assert.ok(allFiles.includes("renamed.ts"));
+  assert.ok(!allFiles.includes("ignored.log"));
 });
 
 test("GitService compares two versions and reads historical content", async () => {
@@ -87,6 +98,16 @@ test("GitService compares two versions and reads historical content", async () =
   assert.equal(byPath.get("new.ts")?.status, "A");
   assert.equal(byPath.get("renamed.ts")?.status, "R");
   assert.equal(byPath.get("removed.ts")?.status, "D");
+
+  const allFiles = await git.getAllFiles(fixtureRoot, {
+    mode: "refs",
+    baseRef: "HEAD~1",
+    targetRef: "HEAD",
+  });
+  assert.ok(allFiles.includes("new.ts"));
+  assert.ok(allFiles.includes("renamed.ts"));
+  assert.ok(!allFiles.includes("removed.ts"));
+  assert.ok(!allFiles.includes("ignored.log"));
 
   assert.equal(
     await git.getRefContent(fixtureRoot, "HEAD~1", "src/a.ts"),
@@ -115,6 +136,11 @@ test("GitService compares index with working tree and reads index content", asyn
   assert.equal(byPath.get("src/a.ts")?.status, "M");
   assert.equal(byPath.get("draft.ts")?.status, "A");
   assert.equal(await git.getIndexContent(fixtureRoot, "src/a.ts"), "staged\n");
+
+  const allFiles = await git.getAllFiles(fixtureRoot, { mode: "index" });
+  assert.ok(allFiles.includes("src/a.ts"));
+  assert.ok(allFiles.includes("draft.ts"));
+  assert.ok(!allFiles.includes("ignored.log"));
 });
 
 test("GitService treats all files as additions in a repository without commits", async () => {

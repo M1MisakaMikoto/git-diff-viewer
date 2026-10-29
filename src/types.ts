@@ -43,7 +43,8 @@ export interface FileNode {
   kind: "file";
   repoRoot: string;
   rootName: string;
-  change: FileChange;
+  filePath: string;
+  change?: FileChange;
 }
 
 export interface RepositoryNode {

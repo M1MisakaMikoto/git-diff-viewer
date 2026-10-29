@@ -7,7 +7,7 @@ import {
 } from "./contentProvider";
 import { GitRefItem, GitService } from "./git";
 import {
-  buildChangeTree,
+  buildFileTree,
   comparisonLabel,
   comparisonSideLabels,
 } from "./model";
@@ -147,17 +147,22 @@ export class DiffViewerController implements vscode.Disposable {
         repositories.map(async (repository) => {
           const comparison = this.getComparison(repository.root);
           try {
-            const changes = await this.git.getChanges(
-              repository.root,
-              comparison,
-            );
+            const [changes, filePaths] = await Promise.all([
+              this.git.getChanges(repository.root, comparison),
+              this.git.getAllFiles(repository.root, comparison),
+            ]);
             const roots =
-              changes.length > 0
-                ? buildChangeTree(changes, repository.root, repository.name)
+              filePaths.length > 0 || changes.length > 0
+                ? buildFileTree(
+                    filePaths,
+                    changes,
+                    repository.root,
+                    repository.name,
+                  )
                 : [
                     {
                       kind: "message" as const,
-                      label: "当前对比没有变更",
+                      label: "仓库中没有可浏览的文件",
                       description: comparisonLabel(comparison),
                       icon: "info" as const,
                       command: {
@@ -482,6 +487,11 @@ export class DiffViewerController implements vscode.Disposable {
       return;
     }
 
+    if (!node.change) {
+      await this.openFile(node);
+      return;
+    }
+
     const snapshot = this.snapshots.get(node.repoRoot);
     if (!snapshot) {
       vscode.window.showWarningMessage("变更数据已过期，请刷新后重试。");
@@ -498,7 +508,7 @@ export class DiffViewerController implements vscode.Disposable {
       "vscode.diff",
       diff.left,
       diff.right,
-      diffTitle(node.change.path, labels.base, labels.target),
+      diffTitle(node.filePath, labels.base, labels.target),
       {
         preview: false,
         preserveFocus: false,
@@ -516,7 +526,7 @@ export class DiffViewerController implements vscode.Disposable {
       return;
     }
 
-    if (node.change.status === "D") {
+    if (node.change?.status === "D") {
       vscode.window.showInformationMessage("该文件在当前目标版本中已删除。");
       return;
     }
@@ -525,7 +535,7 @@ export class DiffViewerController implements vscode.Disposable {
       const uri = createVirtualContentUri({
         source: "ref",
         repoRoot: node.repoRoot,
-        filePath: node.change.path,
+        filePath: node.filePath,
         ref: snapshot.comparison.targetRef ?? "HEAD",
       });
       await vscode.window.showTextDocument(uri, { preview: true });
@@ -533,7 +543,7 @@ export class DiffViewerController implements vscode.Disposable {
     }
 
     const fileUri = vscode.Uri.file(
-      path.join(node.repoRoot, node.change.path),
+      path.join(node.repoRoot, node.filePath),
     );
     try {
       await vscode.window.showTextDocument(fileUri, { preview: true });
@@ -547,7 +557,7 @@ export class DiffViewerController implements vscode.Disposable {
     if (!node || node.kind !== "file") {
       return;
     }
-    await vscode.env.clipboard.writeText(node.change.path);
+    await vscode.env.clipboard.writeText(node.filePath);
   }
 
   private createDiffUris(
@@ -556,6 +566,9 @@ export class DiffViewerController implements vscode.Disposable {
   ): { left: vscode.Uri; right: vscode.Uri } | undefined {
     const comparison = snapshot.comparison;
     const change = node.change;
+    if (!change) {
+      return undefined;
+    }
     const empty = (filePath: string) =>
       createVirtualContentUri({
         source: "empty",

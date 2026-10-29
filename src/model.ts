@@ -277,6 +277,25 @@ export function buildChangeTree(
   repoRoot: string,
   rootName: string,
 ): TreeNode[] {
+  return buildFileTree(
+    changes.map((change) => change.path),
+    changes,
+    repoRoot,
+    rootName,
+  );
+}
+
+export function buildFileTree(
+  filePaths: string[],
+  changes: FileChange[],
+  repoRoot: string,
+  rootName: string,
+): TreeNode[] {
+  interface TreeEntry {
+    path: string;
+    change?: FileChange;
+  }
+
   interface MutableDirectory {
     name: string;
     relativePath: string;
@@ -293,15 +312,31 @@ export function buildChangeTree(
     summary: createEmptySummary(),
   };
 
+  const entries = new Map<string, TreeEntry>();
+  for (const filePath of filePaths) {
+    const normalizedPath = normalizeGitPath(filePath);
+    if (normalizedPath) {
+      entries.set(normalizedPath, { path: normalizedPath });
+    }
+  }
   for (const change of changes) {
-    const normalizedPath = change.path.replace(/\\/g, "/").replace(/^\/+/, "");
+    const normalizedPath = normalizeGitPath(change.path);
+    if (normalizedPath) {
+      entries.set(normalizedPath, { path: normalizedPath, change });
+    }
+  }
+
+  for (const entry of entries.values()) {
+    const normalizedPath = entry.path;
     const segments = normalizedPath.split("/").filter(Boolean);
     if (segments.length === 0) {
       continue;
     }
 
     let directory = root;
-    addToSummary(directory.summary, change);
+    if (entry.change) {
+      addToSummary(directory.summary, entry.change);
+    }
 
     for (let segmentIndex = 0; segmentIndex < segments.length - 1; segmentIndex++) {
       const segment = segments[segmentIndex];
@@ -321,7 +356,9 @@ export function buildChangeTree(
         directory.directories.set(segment, child);
       }
 
-      addToSummary(child.summary, change);
+      if (entry.change) {
+        addToSummary(child.summary, entry.change);
+      }
       directory = child;
     }
 
@@ -329,7 +366,8 @@ export function buildChangeTree(
       kind: "file",
       repoRoot,
       rootName,
-      change,
+      filePath: normalizedPath,
+      change: entry.change,
     });
   }
 
@@ -351,13 +389,17 @@ export function buildChangeTree(
     const files = directory.files
       .slice()
       .sort((left, right) =>
-        compareNames(left.change.path, right.change.path),
+        compareNames(left.filePath, right.filePath),
       );
 
     return [...directories, ...files];
   };
 
   return toTreeNodes(root);
+}
+
+function normalizeGitPath(filePath: string): string {
+  return filePath.replace(/\\/g, "/").replace(/^\/+/, "");
 }
 
 function compareNames(left: string, right: string): number {

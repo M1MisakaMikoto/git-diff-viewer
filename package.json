@@ -1,10 +1,18 @@
 {
-  "name": "git-version-diff-viewer",
-  "displayName": "Git Version Diff Viewer",
-  "description": "按目录浏览 Git 版本差异，并直接打开原生 diff 编辑器。",
+  "name": "git-diff-viewer",
+  "displayName": "Git Diff Viewer",
+  "description": "按目录浏览完整 Git 项目树与版本差异，并直接打开原生 diff 编辑器。",
   "version": "0.1.0",
   "publisher": "local",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/M1MisakaMikoto/git-diff-viewer.git"
+  },
+  "homepage": "https://github.com/M1MisakaMikoto/git-diff-viewer#readme",
+  "bugs": {
+    "url": "https://github.com/M1MisakaMikoto/git-diff-viewer/issues"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -128,27 +136,27 @@
       "view/item/context": [
         {
           "command": "gitDiffViewer.openDiff",
-          "when": "view == gitDiffViewer.changes && viewItem == gitDiffViewer.file",
+          "when": "view == gitDiffViewer.changes && viewItem == gitDiffViewer.changedFile",
           "group": "inline@1"
         },
         {
           "command": "gitDiffViewer.openFile",
-          "when": "view == gitDiffViewer.changes && viewItem == gitDiffViewer.file",
+          "when": "view == gitDiffViewer.changes && (viewItem == gitDiffViewer.file || viewItem == gitDiffViewer.changedFile)",
           "group": "inline@2"
         },
         {
           "command": "gitDiffViewer.openDiff",
-          "when": "view == gitDiffViewer.changes && viewItem == gitDiffViewer.file",
+          "when": "view == gitDiffViewer.changes && viewItem == gitDiffViewer.changedFile",
           "group": "1_open@1"
         },
         {
           "command": "gitDiffViewer.openFile",
-          "when": "view == gitDiffViewer.changes && viewItem == gitDiffViewer.file",
+          "when": "view == gitDiffViewer.changes && (viewItem == gitDiffViewer.file || viewItem == gitDiffViewer.changedFile)",
           "group": "1_open@2"
         },
         {
           "command": "gitDiffViewer.copyPath",
-          "when": "view == gitDiffViewer.changes && viewItem == gitDiffViewer.file",
+          "when": "view == gitDiffViewer.changes && (viewItem == gitDiffViewer.file || viewItem == gitDiffViewer.changedFile)",
           "group": "2_copy@1"
         },
         {

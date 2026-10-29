@@ -163,15 +163,22 @@ export class ChangesTreeProvider
     );
 
     item.id = `dir:${node.repoRoot}:${node.relativePath}`;
-    item.description = `${stateText} · ${node.summary.total}`;
+    item.description =
+      node.summary.total > 0
+        ? `${stateText} · ${node.summary.total}`
+        : undefined;
     item.contextValue = "gitDiffViewer.directory";
     item.iconPath = directoryIcon(node.summary);
 
     const tooltip = new vscode.MarkdownString();
     tooltip.appendMarkdown(`**${node.relativePath}/**  \n\n`);
     tooltip.appendMarkdown(`**${stateText}**  \n`);
-    tooltip.appendMarkdown(`${countsText}  \n`);
-    tooltip.appendMarkdown(`共 ${node.summary.total} 个文件`);
+    if (node.summary.total > 0) {
+      tooltip.appendMarkdown(`${countsText}  \n`);
+      tooltip.appendMarkdown(`共 ${node.summary.total} 个变更文件`);
+    } else {
+      tooltip.appendMarkdown("该目录没有 Git 差异");
+    }
     item.tooltip = tooltip;
 
     return item;
@@ -179,20 +186,40 @@ export class ChangesTreeProvider
 
   private fileTreeItem(node: FileNode): vscode.TreeItem {
     const change = node.change;
-    const filename = change.path.split("/").pop() ?? change.path;
+    const filename = node.filePath.split("/").pop() ?? node.filePath;
+    const item = new vscode.TreeItem(
+      filename,
+      vscode.TreeItemCollapsibleState.None,
+    );
+    item.id = `file:${node.repoRoot}:${node.filePath}`;
+    item.resourceUri = vscode.Uri.file(
+      path.join(node.repoRoot, node.filePath),
+    );
+
+    if (!change) {
+      item.contextValue = "gitDiffViewer.file";
+      item.command = {
+        command: "gitDiffViewer.openFile",
+        title: "打开文件",
+        arguments: [node],
+      };
+
+      const tooltip = new vscode.MarkdownString();
+      tooltip.appendMarkdown(`**${filename}**  \n`);
+      tooltip.appendCodeblock(node.filePath, "text");
+      tooltip.appendMarkdown("无 Git 差异，点击打开文件。");
+      item.tooltip = tooltip;
+      return item;
+    }
+
     const statusLabel = fileStatusLabel(change.status);
     const badge =
       change.similarity !== undefined && change.status === "R"
         ? `${fileStatusBadge(change.status)}${change.similarity}%`
         : fileStatusBadge(change.status);
 
-    const item = new vscode.TreeItem(
-      filename,
-      vscode.TreeItemCollapsibleState.None,
-    );
-    item.id = `file:${node.repoRoot}:${change.path}`;
     item.description = `${badge} · ${statusLabel}`;
-    item.contextValue = "gitDiffViewer.file";
+    item.contextValue = "gitDiffViewer.changedFile";
     item.iconPath = fileIcon(change.status);
     item.command = {
       command: "gitDiffViewer.openDiff",
@@ -202,7 +229,7 @@ export class ChangesTreeProvider
 
     const tooltip = new vscode.MarkdownString();
     tooltip.appendMarkdown(`**${filename}**  \n`);
-    tooltip.appendCodeblock(change.path, "text");
+    tooltip.appendCodeblock(node.filePath, "text");
     tooltip.appendMarkdown(`状态：${statusLabel} (${badge})  \n`);
     if (
       (change.status === "R" || change.status === "C") &&
@@ -271,6 +298,10 @@ function fileIcon(status: ChangeStatus): vscode.ThemeIcon {
 function directoryIcon(
   summary: DirectoryNode["summary"],
 ): vscode.ThemeIcon {
+  if (summary.total === 0) {
+    return new vscode.ThemeIcon("folder");
+  }
+
   if (summary.added === summary.total) {
     return new vscode.ThemeIcon(
       "folder",
