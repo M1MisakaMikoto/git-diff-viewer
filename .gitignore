@@ -1,0 +1,5 @@
+node_modules/
+out/
+*.vsix
+.git-diff-viewer-test-*/
+.DS_Store

@@ -1,0 +1,186 @@
+{
+  "name": "git-version-diff-viewer",
+  "displayName": "Git Version Diff Viewer",
+  "description": "按目录浏览 Git 版本差异，并直接打开原生 diff 编辑器。",
+  "version": "0.1.0",
+  "publisher": "local",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "SCM Providers",
+    "Other"
+  ],
+  "keywords": [
+    "git",
+    "diff",
+    "compare",
+    "version",
+    "scm"
+  ],
+  "activationEvents": [
+    "onView:gitDiffViewer.changes"
+  ],
+  "main": "./out/src/extension.js",
+  "files": [
+    "out/src",
+    "media",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "npm run compile && node --test out/test/*.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@types/vscode": "~1.85.0",
+    "typescript": "^5.6.3"
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "gitDiffViewer",
+          "title": "Git 版本对比",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "gitDiffViewer": [
+        {
+          "id": "gitDiffViewer.changes",
+          "name": "版本差异",
+          "icon": "media/icon.svg",
+          "contextualTitle": "Git 版本对比"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "gitDiffViewer.refresh",
+        "title": "刷新",
+        "category": "Git 版本对比",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gitDiffViewer.chooseComparison",
+        "title": "选择对比范围",
+        "category": "Git 版本对比",
+        "icon": "$(git-compare)"
+      },
+      {
+        "command": "gitDiffViewer.compareHead",
+        "title": "工作区与 HEAD 对比",
+        "category": "Git 版本对比"
+      },
+      {
+        "command": "gitDiffViewer.compareWithVersion",
+        "title": "工作区与指定版本对比",
+        "category": "Git 版本对比"
+      },
+      {
+        "command": "gitDiffViewer.compareVersions",
+        "title": "两个版本对比",
+        "category": "Git 版本对比"
+      },
+      {
+        "command": "gitDiffViewer.compareIndex",
+        "title": "暂存区与工作区对比",
+        "category": "Git 版本对比"
+      },
+      {
+        "command": "gitDiffViewer.openDiff",
+        "title": "打开差异",
+        "category": "Git 版本对比",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "gitDiffViewer.openFile",
+        "title": "打开文件",
+        "category": "Git 版本对比",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "gitDiffViewer.copyPath",
+        "title": "复制相对路径",
+        "category": "Git 版本对比"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "gitDiffViewer.chooseComparison",
+          "when": "view == gitDiffViewer.changes",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gitDiffViewer.refresh",
+          "when": "view == gitDiffViewer.changes",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "gitDiffViewer.openDiff",
+          "when": "view == gitDiffViewer.changes && viewItem == gitDiffViewer.file",
+          "group": "inline@1"
+        },
+        {
+          "command": "gitDiffViewer.openFile",
+          "when": "view == gitDiffViewer.changes && viewItem == gitDiffViewer.file",
+          "group": "inline@2"
+        },
+        {
+          "command": "gitDiffViewer.openDiff",
+          "when": "view == gitDiffViewer.changes && viewItem == gitDiffViewer.file",
+          "group": "1_open@1"
+        },
+        {
+          "command": "gitDiffViewer.openFile",
+          "when": "view == gitDiffViewer.changes && viewItem == gitDiffViewer.file",
+          "group": "1_open@2"
+        },
+        {
+          "command": "gitDiffViewer.copyPath",
+          "when": "view == gitDiffViewer.changes && viewItem == gitDiffViewer.file",
+          "group": "2_copy@1"
+        },
+        {
+          "command": "gitDiffViewer.chooseComparison",
+          "when": "view == gitDiffViewer.changes && viewItem == gitDiffViewer.repository",
+          "group": "inline@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "gitDiffViewer.openDiff",
+          "when": "false"
+        },
+        {
+          "command": "gitDiffViewer.openFile",
+          "when": "false"
+        },
+        {
+          "command": "gitDiffViewer.copyPath",
+          "when": "false"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Git 版本对比",
+      "properties": {
+        "gitDiffViewer.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "文件保存或工作区文件变化后自动刷新差异。"
+        }
+      }
+    }
+  }
+}
